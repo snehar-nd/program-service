@@ -514,7 +514,7 @@ function getNominationsList(req, response) {
         result: err
       }));
     })
-  }else if (data.request.limit === 0) {  
+  }else if (data.request.limit === 0) {
     model.nomination.findAll({
       where: {
         ...findQuery
@@ -522,7 +522,7 @@ function getNominationsList(req, response) {
       attributes: [...data.request.fields || []]
     }).then(async (result) => {
       let aggregatedRes = await aggregatedNominationCount(data, result);
-      
+
       return response.status(200).send(successResponse({
         apiId: 'api.nomination.list',
         ver: '1.0',
@@ -569,7 +569,9 @@ function getNominationsList(req, response) {
             result: result
           }))
         }
-
+        orgList = _.map(orgList, o => {
+          return o.replace(/^1-+/, '')
+        })
         forkJoin(getUsersDetails(req, userList), getOrgDetails(req, orgList)).subscribe((resData) => {
 
           _.forEach(resData, function (data) {
@@ -661,7 +663,7 @@ function aggregatedNominationCount(data, result) {
     }
   })
  }
- 
+
 function getUsersDetails(req, userList) {
   const url = `${envVariables.OPENSABER_SERVICE_URL}/search`;
   const reqData = {
