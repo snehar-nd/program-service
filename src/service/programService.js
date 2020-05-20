@@ -557,7 +557,7 @@ function getNominationsList(req, response) {
           userList.push(data.user_id);
 
           if (data.organisation_id) {
-            orgList.push(data.organisation_id);
+            orgList.push(data.organisation_id.slice(2));
           }
         })
         if (_.isEmpty(userList)) {
@@ -569,11 +569,13 @@ function getNominationsList(req, response) {
             result: result
           }))
         }
-        orgList = _.map(orgList, o => {
-          return o.replace(/^1-+/, '')
-        })
-        forkJoin(getUsersDetails(req, userList), getOrgDetails(req, orgList)).subscribe((resData) => {
+        
+        let splitUserList = []
+        let splitOrgList = []
+        from(userList).pipe(bufferCount(100), map((uId) => getUsersDetails(req, uId))).subscribe(val => splitUserList.push(val))
+        from(orgList).pipe(bufferCount(100), map((oId) => getOrgDetails(req, oId))).subscribe(val => splitOrgList.push(val))
 
+        forkJoin(...splitUserList, ...splitOrgList).subscribe((resData) => {
           _.forEach(resData, function (data) {
             if (data.data.result && !_.isEmpty(_.get(data, 'data.result.User'))) {
               _.forEach(data.data.result.User, (userData) => {
