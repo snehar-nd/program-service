@@ -419,12 +419,12 @@ function addNomination(req, response) {
 function updateNomination(req, response) {
   var data = req.body
   var rspObj = req.rspObj
-  if (!data.request || !data.request.program_id || !data.request.user_id) {
+  if (!data.request && !data.request.program_id && (!data.request.user_id || !data.request.organisation_id) ) {
     rspObj.errCode = programMessages.NOMINATION.UPDATE.MISSING_CODE
     rspObj.errMsg = programMessages.NOMINATION.UPDATE.MISSING_MESSAGE
     rspObj.responseCode = responseCode.CLIENT_ERROR
     logger.error({
-      msg: 'Error due to missing request or request config or request rootOrgId or request type',
+      msg: 'Error due to missing request and request program_id and request user_id or organisation_id',
       err: {
         errCode: rspObj.errCode,
         errMsg: rspObj.errMsg,
@@ -438,12 +438,20 @@ function updateNomination(req, response) {
   }
   const updateQuery = {
     where: {
-      program_id: data.request.program_id,
-      user_id: data.request.user_id
+      program_id: data.request.program_id
     },
     returning: true,
     individualHooks: true
   };
+  if(data.request.user_id){
+    updateQuery.where.user_id = data.request.user_id
+  }
+  if(data.request.organisation_id){
+    updateQuery.where.organisation_id = data.request.organisation_id
+  }
+  if(data.request.id){
+    updateQuery.where.id =  data.request.id
+  }
   const updateValue = req.body.request;
   if (!updateValue.updatedon) {
     updateValue.updatedon = new Date();
@@ -458,15 +466,22 @@ function updateNomination(req, response) {
         result: 'Nomination Not Found'
       }));
     }
+
+    const successRes = {
+      program_id: updateQuery.where.program_id,
+    };
+    if(updateQuery.where.user_id){
+      successRes.user_id = updateQuery.where.user_id
+    }
+    if(updateQuery.where.organisation_id){
+      successRes.organisation_id = updateQuery.where.organisation_id
+    }
     return response.status(200).send(successResponse({
       apiId: 'api.nomination.update',
       ver: '1.0',
       msgid: uuid(),
       responseCode: 'OK',
-      result: {
-        'program_id': updateQuery.where.program_id,
-        'user_id': updateQuery.where.user_id
-      }
+      result: successRes
     }));
   }).catch(err => {
     console.log("Error updating nomination to db", err);
