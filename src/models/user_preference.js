@@ -1,5 +1,7 @@
-module.exports = function(sequelize, DataTypes) {
-    const preference = sequelize.define("user_program_preference", {
+module.exports = function (sequelize, DataTypes) {
+  const preference = sequelize.define(
+    'user_program_preference',
+    {
       user_id: {
         type: DataTypes.STRING,
         allowNull: false
@@ -26,9 +28,11 @@ module.exports = function(sequelize, DataTypes) {
       updatedon: {
         type: DataTypes.DATE
       }
-    }, {
-        timestamps: false,
-        freezeTableName: true
-    });
-    return preference;
-  };
+    },
+    {
+      timestamps: false,
+      freezeTableName: true
+    }
+  )
+  return preference
+}

@@ -17,9 +17,12 @@ var configUtil = require('sb-config-util')
  * @returns {getAppIDForRESP.appId|String}
  */
 function getAppIDForRESP (path) {
-  var arr = path.split(':')[0].split('/').filter(function (n) {
-    return n !== ''
-  })
+  var arr = path
+    .split(':')[0]
+    .split('/')
+    .filter(function (n) {
+      return n !== ''
+    })
   var appId
   if (arr.length === 1) {
     appId = 'api.' + arr[arr.length - 1]
@@ -33,30 +36,30 @@ function getLoggerData (rspObj, level, file, method, message, data, stacktrace) 
   var newDataObj = {}
   if (data && data.headers && data.headers.telemetryData) {
     newDataObj = JSON.parse(JSON.stringify(data))
-    delete newDataObj.headers['telemetryData']
+    delete newDataObj.headers.telemetryData
   } else {
     newDataObj = data
   }
   var dataObj = {
-    'eid': 'BE_LOG',
-    'did': rspObj.did,
-    'ets': Date.now(),
-    'ver': '1.0',
-    'mid': rspObj.msgid,
-    'context': {
-      'pdata': {
-        'id': rspObj.apiId,
-        'ver': rspObj.apiVersion
+    eid: 'BE_LOG',
+    did: rspObj.did,
+    ets: Date.now(),
+    ver: '1.0',
+    mid: rspObj.msgid,
+    context: {
+      pdata: {
+        id: rspObj.apiId,
+        ver: rspObj.apiVersion
       }
     },
-    'edata': {
-      'eks': {
-        'level': level,
-        'class': file,
-        'method': method,
-        'message': message,
-        'data': newDataObj,
-        'stacktrace': stacktrace
+    edata: {
+      eks: {
+        level: level,
+        class: file,
+        method: method,
+        message: message,
+        data: newDataObj,
+        stacktrace: stacktrace
       }
     }
   }
@@ -64,26 +67,34 @@ function getLoggerData (rspObj, level, file, method, message, data, stacktrace) 
   return dataObj
 }
 
-function getPerfLoggerData (rspObj, level, file, method, message, data, stacktrace) {
+function getPerfLoggerData (
+  rspObj,
+  level,
+  file,
+  method,
+  message,
+  data,
+  stacktrace
+) {
   var dataObj = {
-    'eid': 'PERF_LOG',
-    'ets': Date.now(),
-    'ver': '1.0',
-    'mid': rspObj.msgid,
-    'context': {
-      'pdata': {
-        'id': rspObj.apiId,
-        'ver': rspObj.apiVersion
+    eid: 'PERF_LOG',
+    ets: Date.now(),
+    ver: '1.0',
+    mid: rspObj.msgid,
+    context: {
+      pdata: {
+        id: rspObj.apiId,
+        ver: rspObj.apiVersion
       }
     },
-    'edata': {
-      'eks': {
-        'level': level,
-        'class': file,
-        'method': method,
-        'message': message,
-        'data': data,
-        'stacktrace': stacktrace
+    edata: {
+      eks: {
+        level: level,
+        class: file,
+        method: method,
+        message: message,
+        data: data,
+        stacktrace: stacktrace
       }
     }
   }
@@ -98,11 +109,11 @@ function getPerfLoggerData (rspObj, level, file, method, message, data, stacktra
 function getParamsDataForLogEvent (data) {
   const url = getApiUrl(data.path)
   const params = [
-    {'rid': data.msgid},
-    {'title': API_CONFIG[url] && API_CONFIG[url].title},
-    {'category': API_CONFIG[url] && API_CONFIG[url].category},
-    {'url': url},
-    {'method': data.method}
+    { rid: data.msgid },
+    { title: API_CONFIG[url] && API_CONFIG[url].title },
+    { category: API_CONFIG[url] && API_CONFIG[url].category },
+    { url: url },
+    { method: data.method }
   ]
   return params
 }
@@ -140,7 +151,7 @@ function getTelemetryContextData (req) {
  * @param {Object} req
  */
 function updateContextData (oldData, newData) {
-  let contextData = {}
+  const contextData = {}
   contextData.channel = newData.channel || oldData.channel
   contextData.env = newData.env || oldData.env
   contextData.cdata = newData.cdata || oldData.cdata
@@ -157,16 +168,21 @@ function getTelemetryActorData (req) {
   if (req.rspObj && req.rspObj.userId) {
     actor.id = _.toString(req.rspObj.userId)
     actor.type = 'user'
-  } else if (req && req['headers'] && req['headers'] && req['headers']['x-authenticated-user-token']) {
-    var payload = jwt.decode(req['headers']['x-authenticated-user-token'])
-    var userId = payload['sub'].split(':')
+  } else if (
+    req &&
+    req.headers &&
+    req.headers &&
+    req.headers['x-authenticated-user-token']
+  ) {
+    var payload = jwt.decode(req.headers['x-authenticated-user-token'])
+    var userId = payload.sub.split(':')
     actor.id = userId[userId.length - 1]
     actor.type = 'user'
   } else {
     actor.id = _.toString(req.headers['x-consumer-id'])
     actor.type = req.headers['x-consumer-username']
   }
-  if (!actor['id'] || actor['id'] === '') {
+  if (!actor.id || actor.id === '') {
     actor.id = _.toString(process.pid)
     actor.type = 'service'
   }
@@ -191,7 +207,9 @@ function getObjectData (id, type, ver, rollup) {
  * @param {object} res
  */
 function getHttpStatus (res) {
-  return res && res.statusCode >= 100 && res.statusCode < 600 ? res.statusCode : 500
+  return res && res.statusCode >= 100 && res.statusCode < 600
+    ? res.statusCode
+    : 500
 }
 
 /**
@@ -201,11 +219,20 @@ function getHttpStatus (res) {
  * @param {object} msgObject
  */
 function getErrorResponse (rspObj, serverRsp, msgObject) {
-  rspObj.errCode = _.get(serverRsp, 'params.err') ? serverRsp.params.err
-    : (msgObject && msgObject['FAILED_CODE'] ? msgObject['FAILED_CODE'] : null)
-  rspObj.errMsg = _.get(serverRsp, 'params.errmsg') ? serverRsp.params.errmsg
-    : (msgObject && msgObject['FAILED_MESSAGE'] ? msgObject['FAILED_MESSAGE'] : null)
-  rspObj.responseCode = serverRsp && serverRsp.responseCode ? serverRsp.responseCode : responseCode['SERVER_ERROR']
+  rspObj.errCode = _.get(serverRsp, 'params.err')
+    ? serverRsp.params.err
+    : msgObject && msgObject.FAILED_CODE
+      ? msgObject.FAILED_CODE
+      : null
+  rspObj.errMsg = _.get(serverRsp, 'params.errmsg')
+    ? serverRsp.params.errmsg
+    : msgObject && msgObject.FAILED_MESSAGE
+      ? msgObject.FAILED_MESSAGE
+      : null
+  rspObj.responseCode =
+    serverRsp && serverRsp.responseCode
+      ? serverRsp.responseCode
+      : responseCode.SERVER_ERROR
   return rspObj
 }
 

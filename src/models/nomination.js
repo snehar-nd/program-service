@@ -1,5 +1,7 @@
-module.exports = function(sequelize, DataTypes) {
-    const nomination = sequelize.define("nomination", {
+module.exports = function (sequelize, DataTypes) {
+  const nomination = sequelize.define(
+    'nomination',
+    {
       id: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -18,7 +20,7 @@ module.exports = function(sequelize, DataTypes) {
         type: DataTypes.STRING
       },
       status: {
-        type: DataTypes.ENUM("Pending", "Approved", "Rejected"),
+        type: DataTypes.ENUM('Pending', 'Approved', 'Rejected'),
         allowNull: false
       },
       content_types: {
@@ -45,9 +47,11 @@ module.exports = function(sequelize, DataTypes) {
       updatedon: {
         type: DataTypes.DATE
       }
-    }, {
-        timestamps: false,
-        freezeTableName: true
-    });
-    return nomination;
-  };
+    },
+    {
+      timestamps: false,
+      freezeTableName: true
+    }
+  )
+  return nomination
+}

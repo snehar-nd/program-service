@@ -1,0 +1,9 @@
+{
+    "extends": "strongloop",
+    "rules": {
+        "indent": [2, "tab"],
+        "max-len": [2, 120, 8],
+        "no-undef": "off"
+    },
+    "ignorePatterns": [ "libs/**" ] 
+}
