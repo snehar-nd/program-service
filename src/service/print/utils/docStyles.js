@@ -48,14 +48,6 @@ const styles = {
     fontSize: 12,
     margin: [5, 5, 0, 5],
   },
-  question_MTF: {
-    fontSize: 12,
-    margin: [5, 5, 0, 5],
-  },
-  question_COMPREHENSION: {
-    fontSize: 12,
-    margin: [5, 5, 0, 5]
-}
 };
 
 function getInstructionStyle() {
