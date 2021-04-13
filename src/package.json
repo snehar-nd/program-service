@@ -15,6 +15,8 @@
     "bluebird": "^3.7.2",
     "cassandra-driver": "^4.4.0",
     "chai-sorted": "^0.2.0",
+    "cheerio": "^1.0.0-rc.5",
+    "cheerio-tableparser": "^1.0.1",
     "compression": "^1.7.4",
     "cookie-parser": "~1.4.4",
     "dateformat": "^3.0.3",

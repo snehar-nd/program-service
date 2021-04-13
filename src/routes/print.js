@@ -29,7 +29,7 @@ async function printPDF(req, res) {
             content_id: id,
             base64string: binary,
           },
-        };        
+        };
         res.send(resJSON);
       } else {
         res.contentType(`application/pdf; name=${id}.pdf`);

@@ -24,6 +24,9 @@ const getQuestionForSection = dataImporter.__get__("getQuestionForSection");
 const getItemsFromItemset = dataImporter.__get__("getItemsFromItemset");
 const getQuestionFromItem = dataImporter.__get__("getQuestionFromItem");
 
+var cheerio = require("cheerio");
+var cheerioTableparser = require("cheerio-tableparser");
+
 // eslint-disable-next-line no-undef
 describe("Print Service", () => {
   it("[Integration test] should output error for wrong heirarchy ID", (done) => {
@@ -119,7 +122,7 @@ describe("Print Service", () => {
       "do_113213251762339840191",
       (base64PDF, error, errorMsg) => {
         expect(error).to.be.false;
-        expect(errorMsg).to.equal("");        
+        expect(errorMsg).to.equal("");
         done();
       }
     );
@@ -142,5 +145,20 @@ describe("Print Service", () => {
       .catch((e) => {
         done(e);
       });
+  });
+
+  it("Should parse table", (done) => {
+    const table = `<p>Match the following:</p><figure class="table"><table><tbody><tr><td><strong>Column 1</strong></td><td><strong>Column 2</strong></td></tr><tr><td>1</td><td>1</td></tr></tbody></table></figure>`;
+    $ = cheerio.load(table);
+    cheerioTableparser($);
+    var data = [];
+    var columns = $("table").parsetable(false, false, false);
+    const transposeColumns = columns[0].map((_, colIndex) =>
+      columns.map((row) => row[colIndex])
+    );
+    const heading = $("p").text();
+
+    console.log(heading);
+    done();
   });
 });
