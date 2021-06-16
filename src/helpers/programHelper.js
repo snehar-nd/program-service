@@ -520,7 +520,12 @@ class ProgramServiceHelper {
     return new Promise((resolve, reject) => {
       forkJoin(..._.map(collectedData, data => this.getProgramDetails(data.program_id))).subscribe(details => {
       try {
-        const contentTypes = details.length ? _.uniq(_.compact(..._.map(details, model => model && model.dataValues.content_types))) : [];
+        const contentTypes = details.length ? _.uniq(_.compact(..._.map(details, (model) => {
+          if (model && (!_.isEmpty(model.dataValues.content_types))) 
+              return  model.content_types 
+          else (model && (!_.isEmpty(model.dataValues.targetprimarycategorynames)))
+              return model.dataValues.targetprimarycategorynames
+        }))) : [];
         const overalData = _.map(collectedData, data => {
           if (data.collection && data.collection.length) {
           const tableObj = _.map(data.collection, (collection) => {
@@ -559,7 +564,12 @@ class ProgramServiceHelper {
     return new Promise((resolve, reject) => {
       forkJoin(..._.map(collectedData, data => this.getProgramDetails(data.program_id))).subscribe(details => {
         try {
-          const contentTypes = details.length ? _.uniq(_.compact(..._.map(details, model => model && model.dataValues.content_types))) : [];
+          const contentTypes = details.length ? _.uniq(_.compact(..._.map(details, (model) => {
+            if (model && (!_.isEmpty(model.dataValues.content_types))) 
+                return  model.content_types 
+            else (model && (!_.isEmpty(model.dataValues.targetprimarycategorynames)))
+                return model.dataValues.targetprimarycategorynames
+          }))) : [];
           const overalData = _.map(collectedData, data => {
             if (data.collection && data.collection.length) {
               const tableObj = _.map(data.collection, (collection) => {
