@@ -32,7 +32,7 @@ class ProgramServiceHelper {
       data: {
         request: {
           filters: {
-            objectType: 'content',
+            objectType: ['content', 'questionset'],
             programId: programId,
             mimeType: {'!=': 'application/vnd.ekstep.content-collection'},
             contentType: {'!=': 'Asset'},
