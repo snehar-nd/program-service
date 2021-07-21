@@ -1,0 +1,58 @@
+version: 2.1
+jobs:
+  test:
+    working_directory: ~/program-service/src
+    docker:
+      - image: cimg/node:13.10.0
+      - image: circleci/postgres:9.6-alpine
+        environment:
+          POSTGRES_USER: usrtestcases
+          POSTGRES_PASSWORD: $sunbird_program_db_password
+          POSTGRES_DB: $sunbird_program_db_name
+    steps:
+      - checkout:
+          path: ~/program-service
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run:
+          name: Waiting for Postgres to be ready
+          command: |
+            for i in `seq 1 10`;
+            do
+              nc -z localhost 5432 && echo Success && exit 0
+              echo -n .
+              sleep 1
+            done
+            echo Failed waiting for Postgres && exit 1
+      - run:
+          name: PSQL import dummy data
+          command: |
+              sudo apt-get update
+              sudo apt-get install postgresql-client
+              psql -U $sunbird_program_db_user -h localhost -d postgres -c "CREATE DATABASE $sunbird_program_db_name"
+              psql -U $sunbird_program_db_user -h localhost --dbname=$sunbird_program_db_name < sql-data/dummy.sql
+      - run:
+          name: Remove Package Lock
+          command: 'rm -f package-lock.json'
+      - run:
+          name: Install npm deps
+          command: 'npm install'
+      - save_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
+          paths: ./node_modules
+      - run:
+          name: make directory & ng lint
+          command: 'mkdir -p /tmp/logs'
+      - run:
+          name: Execute test cases
+          command: 'npm run test-with-coverage | tee /tmp/logs/test_cases.log'
+      - run:
+          name: Run sonar scanner
+          command: | 
+              sudo npm install -g sonarqube-scanner
+              cd ../ && sonar-scanner
+
+workflows:
+  build_and_test:
+    jobs:
+      - test
