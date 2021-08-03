@@ -624,7 +624,7 @@ class ProgramServiceHelper {
       errObj.responseCode = responseCode.CLIENT_ERROR;
       errObj.loggerMsg = 'Error due to missing request or program_id or request collections or request allowed_content_types or channel'
       cb(errObj, null);
-      loggerService.exitLog({responseCode: errObj.responseCode}, logObject);
+      loggerService.exitLog({responseCode: errObj.responseCode, errMsg: errObj.errMsg, errCode: errObj.errCode}, logObject);
       return false;
     }
 
@@ -688,7 +688,7 @@ class ProgramServiceHelper {
                       }
                       errObj.loggerMsg = 'Error updating hierarchy for collections';
                       cb (errObj, null);
-                      loggerService.exitLog({responseCode: errObj.responseCode}, logObject);
+                      loggerService.exitLog({responseCode: errObj.responseCode, errMsg: errObj.errMsg, errCode: errObj.errCode}, logObject);
                       return false;
                     })
                 }, error => {
@@ -700,7 +700,7 @@ class ProgramServiceHelper {
                   if(error.response && error.response.data) {
                     console.log(`Error fetching hierarchy for collections ==> ${additionalMetaData.programId}  ==>`, JSON.stringify(error.response.data));
                   }
-                  loggerService.exitLog({responseCode: errObj.responseCode}, logObject);
+                  loggerService.exitLog({responseCode: errObj.responseCode, errMsg: errObj.errMsg, errCode: errObj.errCode}, logObject);
                   cb (errObj, null);
                   return false;
                 })
@@ -750,7 +750,6 @@ class ProgramServiceHelper {
                           const updateResultData = _.map(updateResult, obj => {
                             return obj.data
                           })
-
                           rspObj.result = updateResultData;
                           rspObj.responseCode = 'OK';
                           loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
@@ -765,7 +764,7 @@ class ProgramServiceHelper {
                           errObj.errMsg = _.get(error, 'response.data.result.messages') || _.get(error.response, 'data.params.errmsg') || programMessages.COPY_COLLECTION.BULK_UPDATE_HIERARCHY.FAILED_MESSAGE;
                           errObj.responseCode = _.get(error.response, 'data.responseCode') || responseCode.SERVER_ERROR
                           errObj.loggerMsg = 'Error updating hierarchy for collections';
-                          loggerService.exitLog({responseCode: errObj.responseCode}, logObject);
+                          loggerService.exitLog({responseCode: errObj.responseCode, errMsg: errObj.errMsg, errCode: errObj.errCode}, logObject);
                           cb(errObj, null);
                         })
                     }, error => {
@@ -777,7 +776,7 @@ class ProgramServiceHelper {
                       errObj.errMsg = _.get(error.response, 'data.params.errmsg') || programMessages.COPY_COLLECTION.CREATE_COLLECTION.FAILED_MESSAGE;
                       errObj.responseCode = _.get(error.response, 'data.responseCode') || responseCode.SERVER_ERROR
                       errObj.loggerMsg = 'Error creating collection';
-                      loggerService.exitLog({responseCode: errObj.responseCode}, logObject);
+                      loggerService.exitLog({responseCode: errObj.responseCode, errMsg: errObj.errMsg, errCode: errObj.errCode}, logObject);
                       cb(errObj, null);
                     })
                 }, (error) => {
@@ -789,7 +788,7 @@ class ProgramServiceHelper {
                   if(error.response && error.response.data) {
                     console.log(`Error fetching hierarchy for collections ==> ${additionalMetaData.programId}  ==>`, JSON.stringify(error.response.data));
                   }
-                  loggerService.exitLog({responseCode: errObj.responseCode}, logObject);
+                  loggerService.exitLog({responseCode: errObj.responseCode, errMsg: errObj.errMsg, errCode: errObj.errCode}, logObject);
                   cb (errObj, null);
                 })
           }
@@ -804,7 +803,7 @@ class ProgramServiceHelper {
           if(error.response && error.response.data) {
             console.log(`Error searching for collections ==> ${additionalMetaData.programId}  ==>`, JSON.stringify(error.response.data));
           }
-          loggerService.exitLog({responseCode: errObj.responseCode}, logObject);
+          loggerService.exitLog({responseCode: errObj.responseCode, errMsg: errObj.errMsg, errCode: errObj.errCode}, logObject);
           cb (errObj, null);
           return false;
         }
