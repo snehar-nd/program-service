@@ -1107,6 +1107,17 @@ async function programList(req, response) {
          $and : res
       }
     }
+    else if (key === 'target_collection_category' && value) {
+      let targetCollectionCategories = _.map(data.request.filters[key], (val) => {
+        return Sequelize.literal(`'${val}' = ANY (\"program\".\"target_collection_category\")`);
+      });
+
+      res[Op.or] = targetCollectionCategories;
+      delete data.request.filters[key];
+      return {
+         $and : res
+      }
+    }
     else if ((key === 'nomination_enddate' || key === 'content_submission_enddate') && value) {
       let dateFilterValue;
       switch(value) {
