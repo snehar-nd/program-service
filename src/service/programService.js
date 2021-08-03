@@ -872,7 +872,7 @@ function addOrUpdateNomination(programDetails, orgosid) {
                 actorId: programDetails.createdby,
                 params: {}
               }
-              console.log("nomination successfully written to DB", loggerService.logFormate(logFormate));
+              console.log("nomination successfully written to DB", JSON.stringify(loggerService.logFormate(logFormate)));
               return resolve(insertObj);
             }).catch(err => {
               logger.error({ msg: 'Nomination creation failed', error, additionalInfo: { nomDetails: insertObj } }, {});
@@ -2753,7 +2753,7 @@ function addorUpdateUserOrgMapping(userProfile, filterRootOrg, orgOsid, userOsid
           actorId: userProfile.identifier,
           params: {userProfile: consoleLogs[userProfile.identifier]}
         }
-        console.log(loggerService.logFormate(logFormate));
+        console.log(JSON.stringify(loggerService.logFormate(logFormate)));
         callbackFunction(null, updateOsid);
       }
       else {
@@ -2804,7 +2804,7 @@ function addorUpdateUserOrgMapping(userProfile, filterRootOrg, orgOsid, userOsid
           actorId: userProfile.identifier,
           params: {userProfile: consoleLogs[userProfile.identifier]}
         }
-        console.log(loggerService.logFormate(logFormate));
+        console.log(JSON.stringify(loggerService.logFormate(logFormate)));
         callbackFunction(null, _.get(mapRes.data, 'result.User_Org.osid'));
       }
       else {

@@ -56,7 +56,7 @@ class HierarchyService {
         actorId: '',
         params: {collection: option.data.request.data}
       }
-      console.log(loggerService.logFormate(logObject));
+      console.log(JSON.stringify(loggerService.logFormate(logObject)));
       return axios(option);
     });
     return forkJoin(...bulkRequest);
