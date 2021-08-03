@@ -215,7 +215,7 @@ function publishProgram(req, response) {
     rspObj.errMsg = programMessages.PUBLISH.MISSING_MESSAGE
     rspObj.responseCode = responseCode.CLIENT_ERROR
     loggerError('',rspObj,errCode+errorCodes.CODE1);
-    loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
+    loggerService.exitLog({responseCode: rspObj.responseCode, errCode: errCode+errorCodes.CODE1}, logObject);
     return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE1))
   }
 
@@ -253,7 +253,7 @@ function publishProgram(req, response) {
         model.program.update(updateValue, updateQuery).then(resData => {
           if (_.isArray(resData) && !resData[0]) {
             loggerError('',rspObj,errCode+errorCodes.CODE2);
-            loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM'}, logObject);
+            loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM', errCode: errCode+errorCodes.CODE2}, logObject);
             return response.status(400).send(errorResponse({
               apiId: 'api.program.publish',
               ver: '1.0',
@@ -279,7 +279,7 @@ function publishProgram(req, response) {
         })/*.then(onAfterPublishProgram(res,req))*/
         .catch(error => {
           // console.log(error)
-          loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM'}, logObject);
+          loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM', errCode: errCode+errorCodes.CODE3}, logObject);
           loggerError('',rspObj,errCode+errorCodes.CODE3);
           return response.status(400).send(errorResponse({
             apiId: 'api.program.publish',
@@ -289,9 +289,8 @@ function publishProgram(req, response) {
             result: error
           },errCode+errorCodes.CODE3));
         });
-      }
-      else {
-        loggerService.exitLog({responseCode: errObj.responseCode}, logObject);
+      } else {
+        loggerService.exitLog({responseCode: errObj.responseCode, errCode: errCode+errorCodes.CODE4}, logObject);
         loggerError('',rspObj,errCode+errorCodes.CODE4);
         return response.status(400).send(errorResponse(errObj,errCode+errorCodes.CODE4));
       }
@@ -301,13 +300,13 @@ function publishProgram(req, response) {
   })
   .catch(function (err) {
     console.log(err)
-    loggerService.exitLog({responseCode: 'ERR_READ_PROGRAM'}, logObject);
+    loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM', errCode: errCode+errorCodes.CODE5}, logObject);
     loggerError('',rspObj,errCode+errorCodes.CODE5);
     return response.status(400).send(errorResponse({
       apiId: 'api.program.publish',
       ver: '1.0',
       msgid: uuid(),
-      responseCode: 'ERR_READ_PROGRAM',
+      responseCode: 'ERR_PUBLISH_PROGRAM',
       result: err
     },errCode+errorCodes.CODE5));
   });
@@ -326,7 +325,7 @@ function unlistPublishProgram(req, response) {
     rspObj.errCode = programMessages.PUBLISH.MISSING_CODE
     rspObj.errMsg = programMessages.PUBLISH.MISSING_MESSAGE
     rspObj.responseCode = responseCode.CLIENT_ERROR
-    loggerService.exitLog(rspObj.responseCode, logObject);
+    loggerService.exitLog({responseCode: rspObj.responseCode, errCode: errCode+errorCodes.CODE1}, logObject);
     loggerError('',rspObj,errCode+errorCodes.CODE1);
     return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE1))
   }
@@ -364,8 +363,8 @@ function unlistPublishProgram(req, response) {
 
         model.program.update(updateValue, updateQuery).then(resData => {
           if (_.isArray(resData) && !resData[0]) {
-            loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM'}, logObject);
-            loggerError('',rspObj,errCode+errorCodes.CODE2);
+            loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM', errCode: errCode+errorCodes.CODE2}, logObject);
+            loggerError('', rspObj, errCode+errorCodes.CODE2);
             return response.status(400).send(errorResponse({
               apiId: 'api.program.unlist.publish',
               ver: '1.0',
@@ -389,7 +388,7 @@ function unlistPublishProgram(req, response) {
         });
         }).catch(error => {
           console.log(error)
-          loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM'}, logObject);
+          loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM', errCode: errCode+errorCodes.CODE3}, logObject);
           loggerError('',rspObj,errCode+errorCodes.CODE3);
           return response.status(400).send(errorResponse({
             apiId: 'api.program.unlist.publish',
@@ -401,7 +400,7 @@ function unlistPublishProgram(req, response) {
         });
       }
       else {
-        loggerService.exitLog({responseCode: errObj.responseCode}, logObject);
+        loggerService.exitLog({responseCode: errObj.responseCode, errCode: errCode+errorCodes.CODE4}, logObject);
         loggerError('',rspObj,errCode+errorCodes.CODE4);
         return response.status(400).send(errorResponse(errObj,errCode+errorCodes.CODE4));
       }
@@ -411,8 +410,8 @@ function unlistPublishProgram(req, response) {
   })
   .catch(function (err) {
     console.log(err)
-    loggerService.exitLog({responseCode: 'ERR_READ_PROGRAM'}, logObject);
-    loggerError('',rspObj,errCode+errorCodes.CODE5);
+    loggerService.exitLog({responseCode: 'ERR_READ_PROGRAM', errCode: errCode+errorCodes.CODE5}, logObject);
+    loggerError('', rspObj, errCode+errorCodes.CODE5);
     return response.status(400).send(errorResponse({
       apiId: 'api.program.publish',
       ver: '1.0',
@@ -2620,7 +2619,7 @@ function publishContent(req, response){
     rspObj.errMsg = programMessages.CONTENT_PUBLISH.MISSING_MESSAGE
     rspObj.responseCode = responseCode.CLIENT_ERROR
 
-    loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
+    loggerService.exitLog({responseCode: rspObj.responseCode, errCode: rspObj.errCode}, logObject);
     loggerError('',rspObj,errCode+errorCodes.CODE1);
     return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE1));
   }
