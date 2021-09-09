@@ -1150,7 +1150,7 @@ class ProgramServiceHelper {
   }
 
 
-  addBaseUrlIfAbsent(url) {    
+  addBaseUrlIfAbsent(url) {
     if( (url.search("http://") >= 0) || (url.search("https://") >= 0)) return url;
     else return `${envVariables.baseURL}${url}`;
   }
@@ -1203,8 +1203,11 @@ class ProgramServiceHelper {
    */
   async isAlreadyNominated(program_id, orgosid, user_id) {
     let findNomWhere = {
-      program_id: program_id,
-      organisation_id: orgosid
+      program_id: program_id
+    }
+
+    if (orgosid) {
+      findNomWhere['organisation_id'] = orgosid;
     }
 
     if (user_id) {

@@ -20,7 +20,7 @@ const {
   forkJoin
 } = require('rxjs');
 const { catchError , map } = require('rxjs/operators');
-const axios = require('axios');
+const axios = require("axios");
 const envVariables = require('../envVariables');
 const RegistryService = require('./registryService')
 const ProgramServiceHelper = require('../helpers/programHelper');
@@ -756,11 +756,10 @@ function createOrgMappingInRegistry(userProfile, userReg, regMethodCallback) {
 
 function addOrUpdateNomination(programDetails, user_id, orgosid) {
   return new Promise((resolve, reject) => {
-    if (orgosid) {
       const insertObj = {
         program_id: programDetails.program_id,
         user_id: user_id,
-        organisation_id: orgosid,
+        organisation_id: orgosid || null,
         status: 'Approved',
         collection_ids: programDetails.copiedCollections,
       };
@@ -771,9 +770,17 @@ function addOrUpdateNomination(programDetails, user_id, orgosid) {
         insertObj['content_types'] = programDetails.content_types;
       }
       let findNomWhere =  {
-        program_id: programDetails.program_id,
-        organisation_id: orgosid
+        program_id: programDetails.program_id
       }
+
+      if (orgosid) {
+        findNomWhere['organisation_id'] = orgosid;
+      }
+
+      if (user_id) {
+        findNomWhere['user_id'] = user_id;
+      }
+
       return model.nomination.findOne({
         where: findNomWhere
       }).then((res) => {
@@ -824,9 +831,6 @@ function addOrUpdateNomination(programDetails, user_id, orgosid) {
             });
           }
       });
-    } else {
-      return reject({ msg: 'Nomination update failed - OrgId is blank'});
-    }
   });
 }
 
@@ -3211,7 +3215,7 @@ async function asyncOnAfterPublish (req, program_id) {
       });
 
       const collection_ids = _.get(nomination, 'collection_ids') || [];
-      return await nominateRestrictedContributors(req, program, collection_ids);
+      nominateRestrictedContributors(req, program, collection_ids);
     }
   }
   catch(err) {
@@ -3249,12 +3253,33 @@ async function asyncOnAfterPublish (req, program_id) {
           const isNominated = await programServiceHelper.isAlreadyNominated(program.program_id, org.osid);
           if (!isNominated) {
             program['copiedCollections'] = collection_ids;
-            await addOrUpdateNomination(program, org.User.userId, org.osid);
+            addOrUpdateNomination(program, org.User.userId, org.osid);
             usersToNotify.push(org.User);
           }
         }
 
-        return await programServiceHelper.notifyRestrictedContributors(req, program, usersToNotify);
+        if (!_.isEmpty(usersToNotify)) {
+          programServiceHelper.notifyRestrictedContributors(req, program, usersToNotify);
+        }
+      }
+
+      const indList = _.get(program, 'config.contributors.User') || [];
+      if (!_.isEmpty(indList)) {
+        // Get individual users diksha ids
+        const usersToNotify = [];
+        for (const ind of indList) {
+          const userId = _.get(ind, 'User.userId')
+          const isNominated = await programServiceHelper.isAlreadyNominated(program.program_id, undefined, userId);
+          if (!isNominated) {
+            program['copiedCollections'] = collection_ids;
+            addOrUpdateNomination(program, userId);
+            usersToNotify.push(ind.User);
+          }
+        }
+
+        if (!_.isEmpty(usersToNotify)) {
+          programServiceHelper.notifyRestrictedContributors(req, program, usersToNotify);
+        }
       }
     }
   }
