@@ -1,39 +1,16 @@
 const { getData } = require("./dataImporter");
 const docx = require("docx");
 const {
-  Document,
   Packer,
-  Paragraph,
-  TextRun,
-  AlignmentType,
-  ImageRun,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
 } = docx;
-// const getDocx = require("./getDocx");
 const getDocx = require("./getdocxdata");
 const fs = require("fs");
 
 var {
   docDefinition,
-  getStudentTeacherDetails,
-  getExamName,
-  getGradeHeader,
-  getSubject,
-  getTimeAndMarks,
-  getInstructions,
-  getMCQ,
-  getFTB,
   getSectionTitle,
   getTF,
-  getSA,
-  getVSA,
-  getLA,
-  getComprehension,
   getMTFHeader,
-  getMTFChoice,
 } = require("./utils/docDefinition");
 const ProgramServiceHelper = require("../../helpers/programHelper");
 const axios = require("axios");
@@ -88,28 +65,20 @@ const buildDOCXWithCallback = async (id, callback) => {
       if (data.error) {
         callback(null, data.error, data.errorMsg);
       } else {
-        const subject = data.paperData.subject[0];
-        const grade = data.paperData.gradeLevel[0];
-        const examName = data.paperData.name;
-        const instructions = data.paperData.description;
-        let language = data.paperData.medium[0];
-
-        // const language = "Noto";
+        let subject ,grade, examName, instructions,language
+        if(data.paperData){
+           subject = data.paperData.subject && data.paperData.subject[0];
+         grade = data.paperData.gradeLevel && data.paperData.gradeLevel[0];
+         examName = data.paperData.name;
+         instructions = data.paperData.description;
+         language = data.paperData.medium && data.paperData.medium[0];
+        }
         data.sectionData.forEach((d) => {
           d.questions.forEach((element, index) => {
             const marks = parseInt(d.section.children[index].marks);
             if (!isNaN(marks)) totalMarks += marks;
           });
         });
-
-        const contentBase = [
-          getStudentTeacherDetails(),
-          getExamName(examName),
-          getGradeHeader(grade),
-          getSubject(subject),
-          getTimeAndMarks(90, totalMarks),
-          getInstructions(instructions, language),
-        ];
 
         const questionPaperContent = [];
         const paperDetails = {
@@ -131,7 +100,7 @@ const buildDOCXWithCallback = async (id, callback) => {
           for (const [index, question] of d.questions.entries()) {
             questionCounter += 1;
             const marks = section.children[index].marks;
-            // console.log(grade, subject, examName)
+            // console.log(question.category,":",marks,section.children[index])
             let questionContent;
             switch (question.category) {
               case "MCQ":
@@ -402,7 +371,6 @@ async function renderMCQ(question, questionCounter, marks) {
   let questionOpt = [];
   let imageProperties = [];
   if (typeof questionOptions[0][1] === "object") {
-    // console.log("Que:",questionOptions)
     questionOpt.push(questionOptions[0][0] + questionOptions[0][1].image);
     imageProperties.push({
       width: questionOptions[0][1].width,
@@ -450,7 +418,7 @@ async function renderMCQ(question, questionCounter, marks) {
       width: questionOptions[3][1].width,
       height: questionOptions[3][1].height,
     });
-  } else {
+   } else {
     questionOpt.push(questionOptions[3][0]);
     imageProperties.push({
       width: 0,
@@ -467,13 +435,21 @@ async function renderMCQ(question, questionCounter, marks) {
     Marks: marks,
     Language: detectLanguage(questionTitle[0]),
     type: "MCQ",
-    height: imageProperties[0].height,
-    width: imageProperties[0].width,
+    height1: imageProperties[0].height,
+    width1: imageProperties[0].width,
+    height2: imageProperties[1].height,
+    width2: imageProperties[1].width, 
+    height3: imageProperties[2].height,
+    width3: imageProperties[2].width,
+    height4: imageProperties[3].height,
+    width4: imageProperties[3].width,
   };
+  
   return data;
 }
 
 async function renderQuestion(question, questionCounter, marks, Type) {
+  // console.log("Marks:",marks)
   let data;
   if (
     (question.media && question.media.length) ||
@@ -538,7 +514,6 @@ async function renderMTF(question, questionCounter, marks, Type) {
   );
 
   const heading = questionCounter + ". " + cleanHTML($("p").first().text());
-  console.log("MTF:", heading);
   data.push(heading, detectLanguage(heading), marks);
   // console.log("MTF:",transposeColumns)
   data.push(
