@@ -67,6 +67,8 @@ class HierarchyService {
     const rootNode = _.findKey(nodesModified, item => {
       return item.root === true;
     });
+    console.log('getCreatedBy nodesModified ', JSON.stringify(nodesModified));
+    console.log('getCreatedBy rootNode ', rootNode);
     return nodesModified[rootNode].metadata.createdBy || null;
   }
 
