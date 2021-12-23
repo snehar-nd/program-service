@@ -733,6 +733,22 @@ exports.PROGRAM = {
     FAILED_MESSAGE: 'Unable to generate the content report',
     INFO: 'Generate the content report'
   },
+QUML_BULKUPLOAD: {
+    EXCEPTION_CODE: 'QUMLBLK',
+    MISSING_CODE: 'ERR_QUML_BULKUPLOAD',
+    MISSING_MESSAGE: 'Required fields like user_id or publisher_id or organization_id is missing',
+    FAILED_CODE: 'ERR_QUML_BULKUPLOAD_FAILED',
+    FAILED_MESSAGE: 'Unable to perform quml bulk upload',
+    INFO: 'Quml bulk upload'
+  },
+  QUML_BULKSTATUS: {
+    EXCEPTION_CODE: 'QUMLSTS',
+    MISSING_CODE: 'ERR_QUML_BULKSTATUS',
+    MISSING_MESSAGE: 'Err while fetching data',
+    FAILED_CODE: 'ERR_QUML_BULKSTATUS_FAILED',
+    FAILED_MESSAGE: 'Unable to perform quml bulk upload status check',
+    INFO: 'Quml bulk upload status check'
+  },
   CONTENT_PUBLISH: {
     EXCEPTION_CODE: 'CNTPUB',
     MISSING_CODE: 'ERR_CONTENT_PUBLISH',
@@ -749,6 +765,15 @@ exports.PROGRAM = {
     }
   },
   NOMINATION: {
+    NOTIFY: {
+      INFO: 'NOMINATION_NOTIFY',
+      EXCEPTION_CODE: 'NOMNOTIFY',
+      MISSING_CODE: 'ERR_NOTIFY_NOMINATION_CREATED',
+      MISSING_MESSAGE: 'Required fields like email id or phone to send nomination notificiation missing',
+      FAILED_CODE: 'ERR_TO_SEND_NOMINATION_NOTIFICATION_FAILED',
+      FAILED_MESSAGE: 'Unable to send nomination notification',
+      EMAIL_SUBJECT: 'VidyaDaan: Your nomination for {PROGRAM_NAME} project is accepted'
+    },
     READ: {
       EXCEPTION_CODE: 'NOMRED',
       MISSING_CODE: 'ERR_GET_NOMINATION_DATA',

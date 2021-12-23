@@ -7,7 +7,9 @@ class UserService {
     const option = {
       url: learnerService + '/user/v1/search',
       method: 'post',
-      headers: { ...req.headers },
+      headers: {
+        ...req.headers
+      },
       data: {
         "request": {
           "filters": {

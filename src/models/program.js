@@ -13,7 +13,7 @@ module.exports = function(sequelize, DataTypes) {
       type: DataTypes.TEXT
     },
     type: {
-      type: DataTypes.ENUM("public", "private"),
+      type: DataTypes.ENUM("public", "private", "restricted"),
       allowNull: false
     },
     collection_ids: {
@@ -30,6 +30,9 @@ module.exports = function(sequelize, DataTypes) {
     },
     targetprimarycategorynames: {
       type: DataTypes.ARRAY(DataTypes.TEXT)
+    },
+    target_type: {
+      type: DataTypes.STRING
     },
     startdate: {
       type: DataTypes.DATE
@@ -90,6 +93,15 @@ module.exports = function(sequelize, DataTypes) {
     },
     guidelines_url: {
       type: DataTypes.TEXT
+    },
+    acceptedcontents: {
+      type: DataTypes.ARRAY(DataTypes.TEXT)
+    },
+    rejectedcontents: {
+      type: DataTypes.ARRAY(DataTypes.TEXT)
+    },
+    sourcingrejectedcomments: {
+      type: DataTypes.JSONB
     }
   }, {
       timestamps: false,

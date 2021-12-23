@@ -117,7 +117,7 @@ describe("Print Service", () => {
       });
   });
 
-  it("[Integration test] should return a PDF for correct Hierarchy ID", (done) => {
+  xit("[Integration test] should return a PDF for correct Hierarchy ID", (done) => {
     pdf.buildPDFWithCallback(
       "do_11326731857693900818",
       (base64PDF, error, errorMsg) => {

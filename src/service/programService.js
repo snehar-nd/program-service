@@ -20,7 +20,7 @@ const {
   forkJoin
 } = require('rxjs');
 const { catchError , map } = require('rxjs/operators');
-const axios = require('axios');
+const axios = require("axios");
 const envVariables = require('../envVariables');
 const RegistryService = require('./registryService')
 const ProgramServiceHelper = require('../helpers/programHelper');
@@ -28,7 +28,6 @@ const RedisManager = require('../helpers/redisUtil')
 const KafkaService = require('../helpers/kafkaUtil')
 const publishHelper = require('../helpers/publishHelper')
 var async = require('async')
-
 
 const queryRes_Max = 1000;
 const queryRes_Min = 300;
@@ -42,7 +41,6 @@ const registryService = new RegistryService()
 const hierarchyService = new HierarchyService()
 const UserService = require('./userService');
 const userService = new UserService();
-
 function getProgram(req, response) {
  const logObject = {
        traceId : req.headers['x-request-id'] || '',
@@ -177,6 +175,7 @@ function updateProgram(req, response) {
       },errCode+errorCodes.CODE2));
     }
     loggerService.exitLog({responseCode: 'OK'}, logObject);
+    asyncOnAfterPublish(req, data.request.program_id);
     return response.status(200).send(successResponse({
       apiId: 'api.program.update',
       ver: '1.0',
@@ -201,119 +200,130 @@ function updateProgram(req, response) {
 }
 
 function publishProgram(req, response) {
-  var data = req.body;
-  var rspObj = req.rspObj;
+  var reqBody = req.body;
   const logObject = {
     traceId : req.headers['x-request-id'] || '',
     message : programMessages.PUBLISH.INFO
   }
- loggerService.entryLog(data, logObject);
-  const errCode = programMessages.EXCEPTION_CODE+'_'+programMessages.PUBLISH.EXCEPTION_CODE
+  loggerService.entryLog(reqBody, logObject);
 
-  if (!data.request || !data.request.program_id || !data.request.channel) {
-    rspObj.errCode = programMessages.PUBLISH.MISSING_CODE
-    rspObj.errMsg = programMessages.PUBLISH.MISSING_MESSAGE
-    rspObj.responseCode = responseCode.CLIENT_ERROR
-    loggerError('',rspObj,errCode+errorCodes.CODE1);
-    loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
-    return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE1))
+  if (!reqBody.request || !reqBody.request.program_id || !reqBody.request.channel) {
+    req.rspObj.errCode = programMessages.PUBLISH.MISSING_CODE
+    req.rspObj.errMsg = programMessages.PUBLISH.MISSING_MESSAGE
+    req.rspObj.responseCode = responseCode.CLIENT_ERROR
+    loggerError('',req.rspObj,req.rspObj.errCode+errorCodes.CODE1);
+    loggerService.exitLog({responseCode: req.rspObj.responseCode, errCode: req.rspObj.errCode+errorCodes.CODE1}, logObject);
+    return response.status(400).send(errorResponse(req.rspObj,req.rspObj.errCode+errorCodes.CODE1))
   }
+  req.rspObj.errCode = programMessages.EXCEPTION_CODE + '_' + programMessages.PUBLISH.EXCEPTION_CODE
 
-  model.program.findByPk(data.request.program_id)
-  .then(function (res) {
-    const cb = function(errObj, rspObj) {
-      if (!errObj && rspObj) {
-        res.copiedCollections = [];
-        if (rspObj && rspObj.result) {
-          res.copiedCollections = _.map(rspObj.result, (collection) => {
-          return collection.result.content_id;
-          });
-        }
-        const updateValue = {
-          status: "Live",
-          updatedon: new Date(),
-          collection_ids: []
-        };
-
-       const collections = _.get(res, 'config.collections');
-       if (collections) {
-        _.forEach(collections, el => {
-          updateValue.collection_ids.push(el.id);
-        });
-       }
-
-        const updateQuery = {
-          where: {
-            program_id: data.request.program_id
-          },
-          returning: true,
-          individualHooks: true,
-        };
-
-        model.program.update(updateValue, updateQuery).then(resData => {
-          if (_.isArray(resData) && !resData[0]) {
-            loggerError('',rspObj,errCode+errorCodes.CODE2);
-            loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM'}, logObject);
-            return response.status(400).send(errorResponse({
-              apiId: 'api.program.publish',
-              ver: '1.0',
-              msgid: uuid(),
-              responseCode: 'ERR_PUBLISH_PROGRAM',
-              result: 'Program_id Not Found'
-            },errCode+errorCodes.CODE2));
-          }
-          onAfterPublishProgram(res,req, function(afterPublishResponse) {
-              loggerService.exitLog({responseCode: 'OK'}, logObject);
-              return response.status(200).send(successResponse({
-                apiId: 'api.program.publish',
-                ver: '1.0',
-                msgid: uuid(),
-                responseCode: 'OK',
-                result: {
-                  'program_id': updateQuery.where.program_id,
-                  afterPublishResponse
-                }
-              }));
-          });
-
-        })/*.then(onAfterPublishProgram(res,req))*/
-        .catch(error => {
-          // console.log(error)
-          loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM'}, logObject);
-          loggerError('',rspObj,errCode+errorCodes.CODE3);
-          return response.status(400).send(errorResponse({
-            apiId: 'api.program.publish',
-            ver: '1.0',
-            msgid: uuid(),
-            responseCode: 'ERR_PUBLISH_PROGRAM',
-            result: error
-          },errCode+errorCodes.CODE3));
-        });
-      }
-      else {
-        loggerService.exitLog({responseCode: errObj.responseCode}, logObject);
-        loggerError('',rspObj,errCode+errorCodes.CODE4);
-        return response.status(400).send(errorResponse(errObj,errCode+errorCodes.CODE4));
-      }
-    };
-
-    programServiceHelper.copyCollections(res, data.request.channel, req.headers, cb);
-  })
-  .catch(function (err) {
-    console.log(err)
-    loggerService.exitLog({responseCode: 'ERR_READ_PROGRAM'}, logObject);
-    loggerError('',rspObj,errCode+errorCodes.CODE5);
-    return response.status(400).send(errorResponse({
-      apiId: 'api.program.publish',
-      ver: '1.0',
-      msgid: uuid(),
-      responseCode: 'ERR_READ_PROGRAM',
-      result: err
-    },errCode+errorCodes.CODE5));
+  model.program.findByPk(reqBody.request.program_id)
+  .then(function (program) {
+    if (_.get(program, 'program_id') && _.get(program, 'type') === 'private') {
+      req.rspObj.errCode = programMessages.EXCEPTION_CODE+'_'+contentMessages.UNLISTED_PUBLISH.EXCEPTION_CODE
+    }
+    if (_.get(program, 'program_id') && (_.get(program, 'target_type') === 'collections' || _.get(program, 'target_type') === null || _.isUndefined(_.get(program, 'target_type')))) {
+      programServiceHelper.copyCollections(program, req, response, publishCallback);
+    } else if (_.get(program, 'program_id')) {
+      publishCallback(null, req, response, program);
+    } else {
+        loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM', errCode: req.rspObj.errCode+errorCodes.CODE2}, logObject);
+        loggerError('', req.rspObj, req.rspObj.errCode+errorCodes.CODE2);
+        req.rspObj.responseCode = 'ERR_PUBLISH_PROGRAM';
+        req.rspObj.result = 'Program_id Not Found';
+        req.rspObj.errMsg = programMessages.PUBLISH.FAILED_MESSAGE;
+        return response.status(404).send(errorResponse(req.rspObj, req.rspObj.errCode+errorCodes.CODE2));
+    }
+  }).catch(function (err) {
+    console.log(JSON.stringify(err));
+    req.rspObj.responseCode = 'ERR_PUBLISH_PROGRAM';
+    req.rspObj.result = err;
+    req.rspObj.errMsg = programMessages.PUBLISH.FAILED_MESSAGE;
+    loggerService.exitLog({responseCode: req.rspObj.responseCode, errCode: req.rspObj.errCode+errorCodes.CODE5}, logObject);
+    loggerError('', req.rspObj, req.rspObj.errCode+errorCodes.CODE5);
+    return response.status(400).send(errorResponse(req.rspObj, req.rspObjerrCode+errorCodes.CODE5));
   });
 }
 
-function unlistPublishProgram(req, response) {
+const publishCallback = function(errObj, req, response, program, copyCollectionRes) {
+  let logObject = {
+    traceId : req.headers['x-request-id'] || '',
+    message : (_.get(program, 'type') === 'public') ? programMessages.PUBLISH.INFO : contentMessages.UNLISTED_PUBLISH.INFO
+  }
+  if (!errObj && (_.isUndefined(copyCollectionRes) || copyCollectionRes !== null)) {
+    const reqHeaders = req.headers;
+    program.copiedCollections = [];
+      if (copyCollectionRes) {
+        program.copiedCollections = _.map(copyCollectionRes, (collection) => {
+        return collection.result.content_id;
+       });
+    }
+    const updateValue = {
+      status: (_.get(program, 'type') === "public" || _.get(program, 'type') === "restricted") ? "Live" : "Unlisted",
+      updatedon: new Date(),
+      collection_ids: []
+    };
+
+    const collections = _.get(program, 'config.collections');
+    if (collections) {
+      _.forEach(collections, el => {
+        updateValue.collection_ids.push(el.id);
+      });
+    }
+    const updateQuery = {
+      where: {
+        program_id: program.program_id
+      },
+      returning: true,
+      individualHooks: true,
+    };
+
+    model.program.update(updateValue, updateQuery).then(resData => {
+      if (_.isArray(resData) && !resData[0]) {
+        loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM', errCode: req.rspObj.errCode+errorCodes.CODE2}, logObject);
+        loggerError('', req.rspObj, errCode+errorCodes.CODE2);
+        req.rspObj.responseCode = 'ERR_PUBLISH_PROGRAM';
+        req.rspObj.result = 'Program_id Not Found';
+        req.rspObj.errMsg = programMessages.PUBLISH.FAILED_MESSAGE;
+        return response.status(404).send(errorResponse(req.rspObj, req.rspObj.errCode+errorCodes.CODE2));
+      }
+      onAfterPublishProgram(program, reqHeaders, function(afterPublishResponse) {
+        if (afterPublishResponse.error) {
+          console.log(JSON.stringify(afterPublishResponse.error));
+          loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM', errCode: req.rspObj.errCode+errorCodes.CODE3}, logObject);
+          loggerError('', req.rspObj, req.rspObj.errCode+errorCodes.CODE2);
+          req.rspObj.responseCode = 'ERR_PUBLISH_PROGRAM';
+          req.rspObj.result = (_.get(afterPublishResponse.error, 'Error.response.data')) ? _.get(afterPublishResponse.error, 'Error.response.data') : 'On After Publish callback failed';
+          return response.status(400).send(errorResponse(req.rspObj, req.rspObj.errCode+errorCodes.CODE2));
+        } else {
+          loggerService.exitLog({responseCode: 'OK'}, logObject);
+          req.rspObj.responseCode = 'OK';
+          req.rspObj.result = {
+            'program_id': updateQuery.where.program_id,
+            afterPublishResponse
+          };
+          asyncOnAfterPublish(req, updateQuery.where.program_id);
+          return response.status(200).send(successResponse(req.rspObj));
+        }
+    });
+    }).catch(error => {
+      console.log(JSON.stringify(error));
+      loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM', errCode: req.rspObj.errCode+errorCodes.CODE3}, logObject);
+      loggerError('', req.rspObj, req.rspObj.errCode+errorCodes.CODE3);
+      req.rspObj.responseCode = 'ERR_PUBLISH_PROGRAM';
+      req.rspObj.result = error;
+      req.rspObj.errMsg = programMessages.PUBLISH.FAILED_MESSAGE;
+      return response.status(400).send(errorResponse(req.rspObj, req.rspObj.errCode+errorCodes.CODE3));
+    });
+  }
+  else {
+    loggerService.exitLog({responseCode: errObj.responseCode, errCode: req.rspObj.errCode+errorCodes.CODE4}, logObject);
+    loggerError('', req.rspObj, req.rspObj.errCode+errorCodes.CODE4);
+    return response.status(400).send(errorResponse(errObj,req.rspObj.errCode+errorCodes.CODE4));
+  }
+};
+
+/*function unlistPublishProgram(req, response) {
   var data = req.body;
   var rspObj = req.rspObj;
   const logObject = {
@@ -326,102 +336,37 @@ function unlistPublishProgram(req, response) {
     rspObj.errCode = programMessages.PUBLISH.MISSING_CODE
     rspObj.errMsg = programMessages.PUBLISH.MISSING_MESSAGE
     rspObj.responseCode = responseCode.CLIENT_ERROR
-    loggerService.exitLog(rspObj.responseCode, logObject);
-    loggerError('',rspObj,errCode+errorCodes.CODE1);
+    loggerService.exitLog({responseCode: rspObj.responseCode, errCode: errCode+errorCodes.CODE1}, logObject);
+    loggerError('', rspObj, errCode+errorCodes.CODE1);
     return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE1))
   }
 
   model.program.findByPk(data.request.program_id)
   .then(function (res) {
-    const cb = function(errObj, rspObj) {
-      if (!errObj && rspObj) {
-        res.copiedCollections = [];
-          if (rspObj && rspObj.result) {
-           res.copiedCollections = _.map(rspObj.result, (collection) => {
-            return collection.result.content_id;
-           });
-        }
-        const updateValue = {
-          status: "Unlisted",
-          updatedon: new Date(),
-          collection_ids: []
-        };
-
-       const collections = _.get(res, 'config.collections');
-       if (collections) {
-        _.forEach(collections, el => {
-          updateValue.collection_ids.push(el.id);
-        });
-       }
-
-        const updateQuery = {
-          where: {
-            program_id: data.request.program_id
-          },
-          returning: true,
-          individualHooks: true,
-        };
-
-        model.program.update(updateValue, updateQuery).then(resData => {
-          if (_.isArray(resData) && !resData[0]) {
-            loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM'}, logObject);
-            loggerError('',rspObj,errCode+errorCodes.CODE2);
-            return response.status(400).send(errorResponse({
-              apiId: 'api.program.unlist.publish',
-              ver: '1.0',
-              msgid: uuid(),
-              responseCode: 'ERR_PUBLISH_PROGRAM',
-              result: 'Program_id Not Found'
-            },errCode+errorCodes.CODE2));
-          }
-          onAfterPublishProgram(res,req, function(afterPublishResponse) {
-            loggerService.exitLog({responseCode: 'OK'}, logObject);
-            return response.status(200).send(successResponse({
-              apiId: 'api.program.publish',
-              ver: '1.0',
-              msgid: uuid(),
-              responseCode: 'OK',
-              result: {
-                'program_id': updateQuery.where.program_id,
-                afterPublishResponse
-              }
-            }));
-        });
-        }).catch(error => {
-          console.log(error)
-          loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM'}, logObject);
-          loggerError('',rspObj,errCode+errorCodes.CODE3);
-          return response.status(400).send(errorResponse({
-            apiId: 'api.program.unlist.publish',
-            ver: '1.0',
-            msgid: uuid(),
-            responseCode: 'ERR_PUBLISH_PROGRAM',
-            result: error
-          },errCode+errorCodes.CODE3));
-        });
-      }
-      else {
-        loggerService.exitLog({responseCode: errObj.responseCode}, logObject);
-        loggerError('',rspObj,errCode+errorCodes.CODE4);
-        return response.status(400).send(errorResponse(errObj,errCode+errorCodes.CODE4));
-      }
-    };
-
-    programServiceHelper.copyCollections(res, data.request.channel, req.headers, cb);
+    if (_.get(res, 'target_type') === 'collections') {
+      programServiceHelper.copyCollections(res, data.request.channel, req.headers, publishCallback);
+    } else {
+      let callbackParam = {};
+      callbackParam.reqHeaders = req.headers;
+      callbackParam.program = res;
+      callbackParam.responseCode = 'OK';
+      callbackParam.result = {};
+      publishCallback(null, callbackParam);
+    }
   })
   .catch(function (err) {
-    console.log(err)
-    loggerService.exitLog({responseCode: 'ERR_READ_PROGRAM'}, logObject);
-    loggerError('',rspObj,errCode+errorCodes.CODE5);
+    console.log(JSON.stringify(err));
+    loggerService.exitLog({responseCode: 'ERR_PUBLISH_PROGRAM', errCode: errCode+errorCodes.CODE5}, logObject);
+    loggerError('', rspObj, errCode+errorCodes.CODE5);
     return response.status(400).send(errorResponse({
       apiId: 'api.program.publish',
       ver: '1.0',
       msgid: uuid(),
-      responseCode: 'ERR_READ_PROGRAM',
+      responseCode: 'ERR_PUBLISH_PROGRAM',
       result: err
     },errCode+errorCodes.CODE5));
   });
-}
+}*/
 
 function getOsOrgForRootOrgId(rootorg_id, userRegData, reqHeaders) {
     let returnRes = {};
@@ -469,20 +414,19 @@ function getOsOrgForRootOrgId(rootorg_id, userRegData, reqHeaders) {
   })
 }
 
-function onAfterPublishProgram(programDetails, req, afterPublishCallback) {
-  const reqHeaders = req.headers;
+function onAfterPublishProgram(programDetails, reqHeaders, afterPublishCallback) {
   const onPublishResult = {};
   onPublishResult['nomination']= {};
   onPublishResult['userMapping']= {};
   getUserRegistryDetails(programDetails.createdby).then((userRegData) => {
-    getOsOrgForRootOrgId(programDetails.rootorg_id, userRegData, reqHeaders).then((osOrgforRootOrgRes) => {
+    getOsOrgForRootOrgId(programDetails.rootorg_id, userRegData, reqHeaders).then(async (osOrgforRootOrgRes) => {
       const iforgFoundInRegData = osOrgforRootOrgRes.orgFoundInRegData;
       const osOrgforRootOrg = osOrgforRootOrgRes.osOrgforRootOrg;
       const userOsid = _.get(userRegData, 'User.osid');
       const contribMapped = _.find(userRegData.User_Org, function(o) { return o.roles.includes('user') || o.roles.includes('admin') });
       if (userOsid && iforgFoundInRegData && !_.isEmpty(osOrgforRootOrg)) {
         // When in opensaber user is mapped to the org with OrgId as rootOrgId
-        addOrUpdateNomination(programDetails, osOrgforRootOrg.osid).then ((nominationRes) => {
+        addOrUpdateNomination(programDetails, programDetails.createdby, osOrgforRootOrg.osid).then ((nominationRes) => {
           onPublishResult.nomination['error'] = null;
           onPublishResult.nomination['result'] = nominationRes;
           afterPublishCallback(onPublishResult);
@@ -503,7 +447,7 @@ function onAfterPublishProgram(programDetails, req, afterPublishCallback) {
         // When in opensaber user is *not mapped to the org with OrgId as rootOrgId, but we found a org with orgId as rootorgId through query
         // We can map that user to the found org only when user is not mapped to any other org as 'user' or 'admin'
         if (!_.isEmpty(contribMapped)) {
-          addOrUpdateNomination(programDetails, osOrgforRootOrg.osid).then ((nominationRes) => {
+          addOrUpdateNomination(programDetails, programDetails.createdby, osOrgforRootOrg.osid).then ((nominationRes) => {
             onPublishResult.nomination['error'] = null;
             onPublishResult.nomination['result'] = nominationRes;
             afterPublishCallback(onPublishResult);
@@ -529,7 +473,7 @@ function onAfterPublishProgram(programDetails, req, afterPublishCallback) {
           registryService.addRecord(regReq, (userOrgErr, userOrgRes) => {
             if (!userOrgErr && userOrgRes && userOrgRes.status == 200 &&
               !_.isEmpty(_.get(userOrgRes.data, 'result')) && _.get(userOrgRes.data, 'result.User_Org.osid')) {
-                addOrUpdateNomination(programDetails, osOrgforRootOrg.osid).then ((nominationRes) => {
+                addOrUpdateNomination(programDetails, programDetails.createdby, osOrgforRootOrg.osid).then ((nominationRes) => {
                   onPublishResult.nomination['error'] = null;
                   onPublishResult.nomination['result'] = nominationRes;
                   afterPublishCallback(onPublishResult);
@@ -549,7 +493,7 @@ function onAfterPublishProgram(programDetails, req, afterPublishCallback) {
           if (!errObj && rspObj) {
             const userReg = rspObj.result;
 
-            addOrUpdateNomination(programDetails, userReg.User_Org.orgId).then((nominationRes) => {
+            addOrUpdateNomination(programDetails, programDetails.createdby, userReg.User_Org.orgId).then((nominationRes) => {
               onPublishResult.nomination['error'] = null;
               onPublishResult.nomination['result'] = nominationRes;
               afterPublishCallback(onPublishResult);
@@ -585,13 +529,13 @@ function onAfterPublishProgram(programDetails, req, afterPublishCallback) {
                 }).catch((error) => {
                   onPublishResult.userMapping['error'] = error;
                   onPublishResult.userMapping['result'] = { };
-                  console.log(error)
+                  console.log(JSON.stringify(error));
                   logger.error({ msg: 'Error- while adding users to contrib org',
                   additionalInfo: { rootorg_id: programDetails.rootorg_id, orgOsid: _.get(userReg,'User_Org.orgId') } }, {});
                 });
               }
             }).catch((error) => {
-                console.log(error);
+                console.log(JSON.stringify(error));
                 onPublishResult.nomination['error'] = nominationRes;
                 onPublishResult.nomination['result'] = {};
                 afterPublishCallback(onPublishResult);
@@ -601,11 +545,11 @@ function onAfterPublishProgram(programDetails, req, afterPublishCallback) {
             afterPublishCallback(onPublishResult);
           }
         }
+        const dikshaUserProfilesApiResp = await userService.getDikshaUserProfiles({'headers': reqHeaders}, programDetails.createdby);
+        let orgUsersDetails = _.get(dikshaUserProfilesApiResp.data, 'result.response.content');
         // create a registry for the user adn then an org and create mapping for the org as a admin
-        programServiceHelper.getUserDetails(programDetails.createdby, reqHeaders)
-        .subscribe((res)=> {
-          if (res.data.responseCode == "OK" && !_.isEmpty(_.get(res.data, 'result.response.content'))) {
-            const userDetails = _.first(_.get(res.data, 'result.response.content'));
+          if (orgUsersDetails) {
+            const userDetails = _.first(orgUsersDetails);
             if (!userOsid && !_.isEmpty(osOrgforRootOrg)) {
               // if user for created by is not present but org for rootOrg id exists
               createUserMappingInRegistry(userDetails, osOrgforRootOrg, regMethodCallback);
@@ -620,19 +564,15 @@ function onAfterPublishProgram(programDetails, req, afterPublishCallback) {
             onPublishResult['error'] = {msg: "error while getting users details from Diksha"};
             afterPublishCallback(onPublishResult);
           }
-        },(error)=> {
-          onPublishResult['error'] = {msg: "error while getting users details from Diksha " + error.message};
-          afterPublishCallback(onPublishResult);
-        });
       }
     })
     .catch((error) => {
-      console.error(error);
+      console.error(JSON.stringify(error));
       onPublishResult['error'] = {"msg": "getOsOrgForRootOrgId failed " + error.message};
       afterPublishCallback(onPublishResult);
     })
   }).catch((error) => {
-    console.error(error);
+    console.error(JSON.stringify(error));
     onPublishResult['error'] = error;
     afterPublishCallback(onPublishResult);
   })
@@ -810,13 +750,12 @@ function createOrgMappingInRegistry(userProfile, userReg, regMethodCallback) {
   });
 }
 
-function addOrUpdateNomination(programDetails, orgosid) {
+function addOrUpdateNomination(programDetails, user_id, orgosid) {
   return new Promise((resolve, reject) => {
-    if (orgosid) {
       const insertObj = {
         program_id: programDetails.program_id,
-        user_id: programDetails.createdby,
-        organisation_id: orgosid,
+        user_id: user_id,
+        organisation_id: orgosid || null,
         status: 'Approved',
         collection_ids: programDetails.copiedCollections,
       };
@@ -827,9 +766,17 @@ function addOrUpdateNomination(programDetails, orgosid) {
         insertObj['content_types'] = programDetails.content_types;
       }
       let findNomWhere =  {
-        program_id: programDetails.program_id,
-        organisation_id: orgosid
+        program_id: programDetails.program_id
       }
+
+      if (orgosid) {
+        findNomWhere['organisation_id'] = orgosid;
+      }
+
+      if (user_id) {
+        findNomWhere['user_id'] = user_id;
+      }
+
       return model.nomination.findOne({
         where: findNomWhere
       }).then((res) => {
@@ -872,7 +819,7 @@ function addOrUpdateNomination(programDetails, orgosid) {
                 actorId: programDetails.createdby,
                 params: {}
               }
-              console.log("nomination successfully written to DB", loggerService.logFormate(logFormate));
+              console.log("nomination successfully written to DB", JSON.stringify(loggerService.logFormate(logFormate)));
               return resolve(insertObj);
             }).catch(err => {
               logger.error({ msg: 'Nomination creation failed', error, additionalInfo: { nomDetails: insertObj } }, {});
@@ -880,9 +827,6 @@ function addOrUpdateNomination(programDetails, orgosid) {
             });
           }
       });
-    } else {
-      return reject({ msg: 'Nomination update failed - OrgId is blank'});
-    }
   });
 }
 
@@ -1018,10 +962,10 @@ function getProgramCountsByOrg(req, response) {
         return response.status(200).send(successResponse(rspObj));
       }, (error) => {
         rspObj.responseCode = responseCode.SERVER_ERROR
-        rspObj.errCode = programMessages.PROGRAMCOUNTS_BYORG.ORGSEARCH.FAILED_CODE
-        rspObj.errMsg = programMessages.PROGRAMCOUNTS_BYORG.ORGSEARCH.FAILED_MESSAGE
+        rspObj.errCode = programMessages.PROGRAMCOUNTS_BYORG.ORGSEARCH_FETCH.FAILED_CODE
+        rspObj.errMsg = programMessages.PROGRAMCOUNTS_BYORG.ORGSEARCH_FETCH.FAILED_MESSAGE
         loggerError('',rspObj,errCode+errorCodes.CODE1);
-        rspObj.result = err;
+        rspObj.result = error;
         loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
         return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE1));
       })
@@ -1102,6 +1046,17 @@ async function programList(req, response) {
       });
 
       res[Op.or] = contentTypes.concat(targetprimarycategorynames);
+      delete data.request.filters[key];
+      return {
+         $and : res
+      }
+    }
+    else if (key === 'target_collection_category' && value) {
+      let targetCollectionCategories = _.map(data.request.filters[key], (val) => {
+        return Sequelize.literal(`'${val}' = ANY (\"program\".\"target_collection_category\")`);
+      });
+
+      res[Op.or] = targetCollectionCategories;
       delete data.request.filters[key];
       return {
          $and : res
@@ -1189,9 +1144,8 @@ async function programList(req, response) {
               ...filters,
               ...data.request.filters
             },
-
             attributes: data.request.fields || {
-              include : [[Sequelize.json('config.subject'), 'subject'], [Sequelize.json('config.defaultContributeOrgReview'), 'defaultContributeOrgReview'], [Sequelize.json('config.framework'), 'framework'], [Sequelize.json('config.board'), 'board'],[Sequelize.json('config.gradeLevel'), 'gradeLevel'], [Sequelize.json('config.medium'), 'medium']],
+              include : [[Sequelize.json('config.subject'), 'subject'], [Sequelize.json('config.defaultContributeOrgReview'), 'defaultContributeOrgReview'], [Sequelize.json('config.framework'), 'framework'], [Sequelize.json('config.board'), 'board'],[Sequelize.json('config.gradeLevel'), 'gradeLevel'], [Sequelize.json('config.medium'), 'medium'], [Sequelize.json('config.frameworkObj'), 'frameworkObj']],
               exclude: ['config', 'description']
             },
             offset: res_offset,
@@ -1268,7 +1222,7 @@ function addNomination(req, response) {
       }
     }));
   }).catch(err => {
-    console.log("Error adding nomination to db", err);
+    console.log("Error adding nomination to db", JSON.stringify(err));
     loggerService.exitLog({responseCode: 'ERR_CREATE_PROGRAM'}, logObject);
     loggerError('',rspObj,errCode+errorCodes.CODE2);
     return response.status(400).send(errorResponse({
@@ -1356,7 +1310,7 @@ function updateNomination(req, response) {
     }));
   }).catch(err => {
     loggerService.exitLog({responseCode: 'ERR_UPDATE_NOMINATION'}, logObject);
-    console.log("Error updating nomination to db", err);
+    console.log("Error updating nomination to db", JSON.stringify(err));
     loggerError('',rspObj,errCode+errorCodes.CODE3);
     return response.status(400).send(errorResponse({
       apiId: 'api.nomination.update',
@@ -1503,19 +1457,19 @@ function getNominationsList(req, response) {
             result: result
           }))
         }, (error) => {
-          console.log(error)
+          console.log(JSON.stringify(error));
           loggerService.exitLog(rspObj.responseCode, logObject);
           loggerError('',rspObj,errCode+errorCodes.CODE3);
           return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE3));
         });
       } catch (err) {
-        console.log(err)
+        console.log(JSON.stringify(err));
         loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
         loggerError('Error fetching nomination with limit and offset',rspObj,errCode+errorCodes.CODE4);
         return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE4));
       }
     }).catch(function (err) {
-      console.log(err)
+      console.log(JSON.stringify(err));
       loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
       loggerError('Error fetching nomination with limit and offset',rspObj,errCode+errorCodes.CODE5);
       return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE5));
@@ -1533,6 +1487,7 @@ async function downloadProgramDetails(req, res) {
   loggerService.entryLog(data, logObject);
   const errCode = programMessages.EXCEPTION_CODE+'_'+programMessages.GENERATE_DETAILS.EXCEPTION_CODE
   let programArr = [], promiseRequests = [], cacheData = [], filteredPrograms = [];
+  let programObjs = {};
   rspObj.errCode = programMessages.GENERATE_DETAILS.FAILED_CODE
   rspObj.errMsg = programMessages.GENERATE_DETAILS.FAILED_MESSAGE
   rspObj.responseCode = responseCode.SERVER_ERROR
@@ -1556,16 +1511,26 @@ async function downloadProgramDetails(req, res) {
   });
 
   if (filteredPrograms.length) {
-  promiseRequests =  _.map(filteredPrograms, (program) => {
-    return [programServiceHelper.getCollectionWithProgramId(program, req), programServiceHelper.getSampleContentWithOrgId(program, req),programServiceHelper.getSampleContentWithCreatedBy(program, req),
-      programServiceHelper.getContributionWithProgramId(program, req), programServiceHelper.getNominationWithProgramId(program),
-      programServiceHelper.getOveralNominationData(program)];
-  });
+    if (data.request.filters.targetType  && data.request.filters.targetType === 'searchCriteria') { 
+      await _.forEach(programArr, (programId) => {
+        programServiceHelper.getProgramDetails(programId).then((program)=> {
+          programObjs[programId] = program;
+        });
+      });
+    }
+    promiseRequests =  _.map(filteredPrograms, (program) => {
+      if (!data.request.filters.targetType  || data.request.filters.targetType === 'collections') {
+        return [programServiceHelper.getCollectionWithProgramId(program, req), programServiceHelper.getSampleContentWithOrgId(program, req),programServiceHelper.getSampleContentWithCreatedBy(program, req), programServiceHelper.getContributionWithProgramId(program, req), programServiceHelper.getNominationWithProgramId(program), programServiceHelper.getOveralNominationData(program)];
+      } else if(data.request.filters.targetType === 'searchCriteria') {
+        return[programServiceHelper.getContentContributionsWithProgramId(program, req)];
+      }
+    });
 
     forkJoin(..._.flatMapDeep(promiseRequests)).subscribe((responseData) => {
     try{
-    const combainedRes = _.chunk(responseData, 6);
-    const programDetailsArray = programServiceHelper.handleMultiProgramDetails(combainedRes);
+    const chunkNumber = (!data.request.filters.targetType  || data.request.filters.targetType === 'collections') ? 6 : 1;
+    const combainedRes = _.chunk(responseData, chunkNumber);
+    const programDetailsArray = programServiceHelper.handleMultiProgramDetails(combainedRes, programObjs, data.request.filters.targetType);
     const tableData  = _.reduce(programDetailsArray, (final, data, index) => {
     final.push({program_id: filteredPrograms[index], values: data});
     return final;
@@ -1587,11 +1552,13 @@ async function downloadProgramDetails(req, res) {
     loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
     return res.status(200).send(successResponse(rspObj));
   } catch (err) {
+    console.log(JSON.stringify(err));
     loggerError('Error due to unhandled exception',rspObj,errCode+errorCodes.CODE2);
     loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
     return res.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE2));
   }
     }, (err) => {
+      console.log(JSON.stringify(err));
       loggerError('Error http requests or nomination table query promise failure',rspObj,errCode+errorCodes.CODE3);
       loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
       return res.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE3));
@@ -1698,7 +1665,7 @@ function aggregatedNominationCount(data, result) {
                 const contentResult = _.first(promiseData);
                 if (contentResult && contentResult.data && contentResult.data.result) {
                     const contents = _.compact(_.concat(_.get(contentResult.data.result, 'QuestionSet'), _.get(contentResult.data.result, 'content')));
-                    relatedContents = contents;       
+                    relatedContents = contents;
                 }
                 nominationSampleCounts = programServiceHelper.setNominationSampleCounts(relatedContents);
                   const userAndOrgResult = _.tail(promiseData, 2);
@@ -2381,7 +2348,10 @@ async function programCopyCollections(req, response) {
                     rspObj.errCode = programMessages.COPY_COLLECTION.BULK_UPDATE_HIERARCHY.FAILED_CODE;
                       rspObj.errMsg = programMessages.COPY_COLLECTION.BULK_UPDATE_HIERARCHY.FAILED_MESSAGE;
                       rspObj.responseCode = responseCode.SERVER_ERROR
-                      console.log('Error updating hierarchy for collections', error)
+                      console.log('Error updating hierarchy for collections', JSON.stringify(error));
+                      if(error && error.response && error.response.data) {
+                        console.log(`Error updating hierarchy for collections ==> ${additionalMetaData.programId}  ==>`, JSON.stringify(error.response.data));
+                      }
                       loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
                       loggerError('',rspObj,errCode+errorCodes.CODE2);
                     return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE2))
@@ -2390,7 +2360,10 @@ async function programCopyCollections(req, response) {
                 rspObj.errCode = programMessages.COPY_COLLECTION.GET_HIERARCHY.FAILED_CODE;
                   rspObj.errMsg = programMessages.COPY_COLLECTION.GET_HIERARCHY.FAILED_MESSAGE;
                   rspObj.responseCode = responseCode.SERVER_ERROR
-                  console.log('Error fetching hierarchy for collections', error)
+                  console.log('Error fetching hierarchy for collections', JSON.stringify(error));
+                  if(error && error.response && error.response.data) {
+                    console.log(`Error fetching hierarchy for collections ==> ${additionalMetaData.programId}  ==>`, JSON.stringify(error.response.data));
+                  }
                   loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
                   loggerError('',rspObj,errCode+errorCodes.CODE3);
                 return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE3))
@@ -2446,7 +2419,10 @@ async function programCopyCollections(req, response) {
                         rspObj.errCode = _.get(error.response, 'data.params.err') || programMessages.COPY_COLLECTION.BULK_UPDATE_HIERARCHY.FAILED_CODE;
                         rspObj.errMsg = _.get(error.response, 'data.params.errmsg') || programMessages.COPY_COLLECTION.BULK_UPDATE_HIERARCHY.FAILED_MESSAGE;
                         rspObj.responseCode = _.get(error.response, 'data.responseCode') || responseCode.SERVER_ERROR
-                        console.log('Error updating hierarchy for collections', error)
+                        console.log('Error updating hierarchy for collections', JSON.stringify(error));
+                        if(error && error.response && error.response.data) {
+                          console.log(`Error updating hierarchy for collections ==> ${additionalMetaData.programId}  ==>`, JSON.stringify(error.response.data));
+                        }
                         loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
                         loggerError('',rspObj,errCode+errorCodes.CODE4);
                         return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE4))
@@ -2455,7 +2431,10 @@ async function programCopyCollections(req, response) {
                     rspObj.errCode = _.get(error.response, 'data.params.err') || programMessages.COPY_COLLECTION.CREATE_COLLECTION.FAILED_CODE;
                     rspObj.errMsg = _.get(error.response, 'data.params.errmsg') || programMessages.COPY_COLLECTION.CREATE_COLLECTION.FAILED_MESSAGE;
                     rspObj.responseCode = _.get(error.response, 'data.responseCode') || responseCode.SERVER_ERROR
-                    console.log('Error creating collection', error)
+                    console.log('Error creating collection', JSON.stringify(error));
+                    if(error && error.response && error.response.data) {
+                      console.log(`Error creating collection ==> ${additionalMetaData.programId}  ==>`, JSON.stringify(error.response.data));
+                    }
                     loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
                     loggerError('',rspObj,errCode+errorCodes.CODE5);
                     return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE5))
@@ -2464,7 +2443,10 @@ async function programCopyCollections(req, response) {
                 rspObj.errCode = programMessages.COPY_COLLECTION.GET_HIERARCHY.FAILED_CODE;
                 rspObj.errMsg = programMessages.COPY_COLLECTION.GET_HIERARCHY.FAILED_MESSAGE;
                 rspObj.responseCode = responseCode.SERVER_ERROR
-                console.log('Error fetching hierarchy for collections', error)
+                console.log('Error fetching hierarchy for collections', JSON.stringify(error));
+                if(error && error.response && error.response.data) {
+                  console.log(`Error fetching hierarchy for collections ==> ${additionalMetaData.programId}  ==>`, JSON.stringify(error.response.data));
+                }
                 loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
                 loggerError('',rspObj,errCode+errorCodes.CODE6);
                 return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE6))
@@ -2475,8 +2457,10 @@ async function programCopyCollections(req, response) {
         rspObj.errCode = programMessages.COPY_COLLECTION.SEARCH_DOCK_COLLECTION.FAILED_CODE;
         rspObj.errMsg = error.message || programMessages.COPY_COLLECTION.SEARCH_DOCK_COLLECTION.FAILED_MESSAGE;
         rspObj.responseCode = error.response.statusText || responseCode.SERVER_ERROR
-        console.log('Error searching for collections', error)
-
+        console.log('Error searching for collections', JSON.stringify(error));
+        if(error && error.response && error.response.data) {
+          console.log(`Error searching for collections ==> ${additionalMetaData.programId}  ==>`, JSON.stringify(error.response.data));
+        }
         loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
         loggerError('',rspObj,errCode+errorCodes.CODE7);
         return response.status(error.response.status || 400).send(errorResponse(rspObj,errCode+errorCodes.CODE7))
@@ -2609,8 +2593,8 @@ function publishContent(req, response){
     rspObj.errMsg = programMessages.CONTENT_PUBLISH.MISSING_MESSAGE
     rspObj.responseCode = responseCode.CLIENT_ERROR
 
-    loggerService.exitLog({responseCode: rspObj.responseCode}, logObject);
-    loggerError('',rspObj,errCode+errorCodes.CODE1);
+    loggerService.exitLog({responseCode: rspObj.responseCode, errCode: rspObj.errCode}, logObject);
+    loggerError('', rspObj, errCode+errorCodes.CODE1);
     return response.status(400).send(errorResponse(rspObj,errCode+errorCodes.CODE1));
   }
 
@@ -2636,7 +2620,7 @@ function publishContent(req, response){
         const eventData = publishHelper.getPublishContentEvent(contentMetaData, data.request.origin.textbook_id, units);
         KafkaService.sendRecord(eventData, function (err, res) {
           if (err) {
-            console.log(err)
+            console.log(JSON.stringify(err));
             logger.error({ msg: 'Error while sending event to kafka', err, additionalInfo: { eventData } })
             rspObj.errCode = programMessages.CONTENT_PUBLISH.FAILED_CODE
             rspObj.errMsg = 'Error while sending event to kafka'
@@ -2655,7 +2639,7 @@ function publishContent(req, response){
         });
       },
       (error) => {
-        console.log(error)
+        console.log(JSON.stringify(error));
         rspObj.errCode = programMessages.CONTENT_PUBLISH.FAILED_CODE
         rspObj.errMsg = programMessages.CONTENT_PUBLISH.FAILED_MESSAGE
         rspObj.responseCode = responseCode.SERVER_ERROR
@@ -2700,7 +2684,7 @@ function addorUpdateUserOrgMapping(userProfile, filterRootOrg, orgOsid, userOsid
         sourcingOrgs.push(mappingObj.orgId);
       }
 
-      if (mappingObj.orgId == orgOsid) {
+      if (mappingObj.orgId === orgOsid) {
         updateOsid = mappingObj.osid;
         if (userOrgRoles.includes('ORG_ADMIN')) {
           uRoles.push('admin');
@@ -2742,7 +2726,7 @@ function addorUpdateUserOrgMapping(userProfile, filterRootOrg, orgOsid, userOsid
           actorId: userProfile.identifier,
           params: {userProfile: consoleLogs[userProfile.identifier]}
         }
-        console.log(loggerService.logFormate(logFormate));
+        console.log(JSON.stringify(loggerService.logFormate(logFormate)));
         callbackFunction(null, updateOsid);
       }
       else {
@@ -2793,7 +2777,7 @@ function addorUpdateUserOrgMapping(userProfile, filterRootOrg, orgOsid, userOsid
           actorId: userProfile.identifier,
           params: {userProfile: consoleLogs[userProfile.identifier]}
         }
-        console.log(loggerService.logFormate(logFormate));
+        console.log(JSON.stringify(loggerService.logFormate(logFormate)));
         callbackFunction(null, _.get(mapRes.data, 'result.User_Org.osid'));
       }
       else {
@@ -2864,7 +2848,7 @@ function mapusersToContribOrg(orgOsid, filters, reqHeaders) {
                       }
                     } else {
                       tempRes.result.push(re);
-                      console.log(err);
+                      console.log(JSON.stringify(err));
                       if (checkIfReturnResult(tempRes.result.length, tempRes.count)) {
                         return resolve(tempRes);
                       }
@@ -2893,7 +2877,7 @@ function mapusersToContribOrg(orgOsid, filters, reqHeaders) {
                 } else {
                   re.error = err || {msg: 'Error- addorUpdateUserOrgMapping'};
                   tempRes.result.push(re);
-                  console.log(err);
+                  console.log(JSON.stringify(err));
                   if (checkIfReturnResult(tempRes.result.length, tempRes.result.count)) {
                     return resolve(tempRes);
                   }
@@ -2964,14 +2948,14 @@ function onBeforeMigratingUsers(request) {
                 }
               }, {});
             }).catch((error) => {
-              console.log(error)
+              console.log(JSON.stringify(error));
               logger.error({ msg: 'Error- while adding users to contrib org',
               additionalInfo: { rootorg_id: data.request.rootorg_id, orgOsid: orgOsid } }, {});
             });
           }
         }
       }).catch((error) => {
-        console.log(error);
+        console.log(JSON.stringify(error));
       });
     }
   })
@@ -3218,12 +3202,113 @@ function getParams(msgId, status, errCode, msg) {
   return params
 }
 
+async function asyncOnAfterPublish (req, program_id) {
+  var rspObj = req.rspObj;
+  const logObject = {
+    traceId : req.headers['x-request-id'] || '',
+    message : programMessages.NOMINATION.INFO
+  }
+  const errCode = programMessages.EXCEPTION_CODE+'_'+programMessages.NOMINATION.EXCEPTION_CODE;
+
+  try {
+    const res = await model.program.findByPk(program_id);
+    const program = _.get(res, 'dataValues');
+
+    if (_.get(program, 'type') === 'restricted' && _.get(program, 'status') === 'Live') {
+      const nomination = await model.nomination.findOne({
+        where: {
+          program_id: program_id,
+          user_id: _.get(program, 'createdby')
+        }
+      });
+
+      const collection_ids = _.get(nomination, 'collection_ids') || [];
+      nominateRestrictedContributors(req, program, collection_ids);
+    }
+  }
+  catch(err) {
+    console.log('nominate restricted contributor error', JSON.stringify(err))
+    if(err.response && err.response.data) {
+      console.log(`nominate restricted contributor error ==> ${program.program_id}  ==>`, JSON.stringify(err.response.data));
+    }
+    rspObj.errCode = programMessages.NOMINATION.CREATE.FAILED_CODE
+    rspObj.errMsg = programMessages.NOMINATION.CREATE.FAILED_MESSAGE
+    rspObj.responseCode = responseCode.SERVER_ERROR
+    loggerService.exitLog(rspObj.responseCode, logObject);
+    loggerError('',rspObj,errCode+errorCodes.CODE1);
+  }
+}
+
+/**
+ * Nominate restricted contributors
+ *
+ * @param  program  program data object
+ */
+ async function nominateRestrictedContributors(req, program, collection_ids) {
+  var rspObj = req.rspObj;
+  const logObject = {
+    traceId : req.headers['x-request-id'] || '',
+    message : programMessages.NOMINATION.INFO
+  }
+
+  try {
+    if (!_.isEmpty(_.get(program, 'config.contributors'))) {
+      const orgList = _.get(program, 'config.contributors.Org') || [];
+      if (!_.isEmpty(orgList)) {
+        // Get org creator diksha ids
+        const usersToNotify = [];
+        for (const org of orgList) {
+          const isNominated = await programServiceHelper.isAlreadyNominated(program.program_id, org.osid);
+          if (!isNominated) {
+            program['copiedCollections'] = collection_ids;
+            addOrUpdateNomination(program, org.User.userId, org.osid);
+            usersToNotify.push(org.User);
+          }
+        }
+
+        if (!_.isEmpty(usersToNotify)) {
+          programServiceHelper.notifyRestrictedContributors(req, program, usersToNotify);
+        }
+      }
+
+      const indList = _.get(program, 'config.contributors.User') || [];
+      if (!_.isEmpty(indList)) {
+        // Get individual users diksha ids
+        const usersToNotify = [];
+        for (const ind of indList) {
+          const userId = _.get(ind, 'User.userId')
+          const isNominated = await programServiceHelper.isAlreadyNominated(program.program_id, undefined, userId);
+          if (!isNominated) {
+            program['copiedCollections'] = collection_ids;
+            addOrUpdateNomination(program, userId);
+            usersToNotify.push(ind.User);
+          }
+        }
+
+        if (!_.isEmpty(usersToNotify)) {
+          programServiceHelper.notifyRestrictedContributors(req, program, usersToNotify);
+        }
+      }
+    }
+  }
+  catch (err) {
+    console.log('nominate restricted contributor error', JSON.stringify(err))
+    if(err.response && err.response.data) {
+      console.log(`nominate restricted contributor error ==> ${program.program_id}  ==>`, JSON.stringify(err.response.data));
+    }
+    rspObj.errCode = programMessages.NOMINATION.CREATE.FAILED_CODE
+    rspObj.errMsg = programMessages.NOMINATION.CREATE.FAILED_MESSAGE
+    rspObj.responseCode = responseCode.SERVER_ERROR
+    loggerService.exitLog(rspObj.responseCode, logObject);
+  }
+}
+
 module.exports.syncUsersToRegistry = syncUsersToRegistry
 module.exports.getProgramAPI = getProgram
 module.exports.createProgramAPI = createProgram
 module.exports.updateProgramAPI = updateProgram
 module.exports.publishProgramAPI = publishProgram
-module.exports.unlistPublishProgramAPI = unlistPublishProgram
+//module.exports.unlistPublishProgramAPI = unlistPublishProgram
 module.exports.deleteProgramAPI = deleteProgram
 module.exports.programListAPI = programList
 module.exports.addNominationAPI = addNomination

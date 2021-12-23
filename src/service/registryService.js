@@ -4,7 +4,6 @@ const axios = require('axios');
 const _ = require("lodash");
 
 class RegistryService {
-
     constructor() {
     }
 
@@ -27,7 +26,7 @@ class RegistryService {
     }
 
     async getUserList(data, userIds) {
-      const filters = _.get(data.request, 'filters.user');
+      const filters = _.get(data, 'request.filters.user');
       const option = {
         url: registryUrl + '/search',
         method: 'post',
